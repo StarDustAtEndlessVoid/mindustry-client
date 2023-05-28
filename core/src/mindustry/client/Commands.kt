@@ -44,7 +44,7 @@ import kotlin.math.*
 import kotlin.random.*
 
 
-fun setup() {
+fun setupCommands() {
     register("help [page/command]", Core.bundle.get("client.command.help.description")) { args, player ->
         if (args.isNotEmpty() && !Strings.canParseInt(args[0])) {
             val command = clientCommandHandler.commandList.find { it.text == args[0] }
@@ -298,7 +298,8 @@ fun setup() {
             confirmed && inProgress -> Core.bundle.format("client.command.fixpower.inprogress", configs.size, n, confs)
             confirmed -> { // Actually fix the connections
                 configs.add { // This runs after the connections are made
-                    msg.message = Core.bundle.format("client.command.fixpower.success", n, Groups.powerGraph.array.select { it.graph().all.first().team == player.team() }.size, confs)
+                    val active = Groups.powerGraph.array.select { it.graph().all.first().team == player.team() && it.graph().all.contains { it !is ItemBridge.ItemBridgeBuild || it.shouldConsume() } }.size // We don't care about unlinked bridge ends
+                    msg.message = Core.bundle.format("client.command.fixpower.success", n, active, confs)
                     msg.format()
                 }
                 Core.bundle.format("client.command.fixpower.confirmed", n, confs)
@@ -400,6 +401,7 @@ fun setup() {
             Core Capture: ${rules.coreCapture}
             Core Incinerates: ${rules.coreIncinerates}
             Core Modifies Unit Cap: ${rules.unitCapVariable}
+            Only Deposit Core: ${rules.onlyDepositCore}
             """.trimIndent()
         })
     }

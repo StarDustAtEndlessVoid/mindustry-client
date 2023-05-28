@@ -2,8 +2,6 @@ package mindustry.client
 
 import arc.*
 import arc.Core.*
-import arc.KeyBinds.*
-import arc.input.*
 import arc.math.geom.*
 import arc.struct.*
 import arc.util.*
@@ -18,7 +16,6 @@ import mindustry.client.utils.*
 import mindustry.core.*
 import mindustry.game.EventType.*
 import mindustry.gen.*
-import mindustry.input.*
 import mindustry.logic.*
 import mindustry.net.*
 import mindustry.type.*
@@ -27,8 +24,6 @@ import mindustry.world.blocks.defense.turrets.*
 import mindustry.world.blocks.power.*
 import mindustry.world.blocks.sandbox.*
 import kotlin.random.*
-import kotlin.reflect.full.*
-import kotlin.reflect.jvm.*
 import kotlin.system.*
 
 /** WIP client logic class, similar to [Logic] but for the client.
@@ -77,11 +72,13 @@ class ClientLogic {
 
         Events.on(WorldLoadEvent::class.java) { // Run when the world finishes loading (also when the main menu loads and on syncs)
             app.post { syncing = false } // Run this next frame so that it can be used elsewhere safely
+            lastJoinTime = Time.millis()
             if (!syncing) {
                 AutoTransfer.enabled = settings.getBool("autotransfer") && !(state.rules.pvp && Server.io())
+                Server.ohnoTask?.cancel()
+                Server.ohnoTask = if (Server.fish()) Timer.schedule({ Call.sendChatMessage("/ohno") }, 0f, .5f) else null
                 frozenPlans.clear()
             }
-            lastJoinTime = Time.millis()
             configs.clear()
             control.input.lastVirusWarning = null
             dispatchingBuildPlans = false
@@ -92,6 +89,7 @@ class ClientLogic {
             showingAllyTurrets = false
             showingInvTurrets = false
             if (state.rules.pvp && !isDeveloper()) ui.announce("[scarlet]Don't use a client in pvp, it's uncool!", 5f)
+            if (!state.rules.schematicsAllowed && !syncing) ui.announce("[scarlet]This map has schematics disabled.", 5f)
             overdrives.clear()
             massDrivers.clear()
             payloadMassDrivers.clear()
@@ -105,13 +103,11 @@ class ClientLogic {
         }
 
         Events.on(ClientLoadEvent::class.java) { // Run when the client finishes loading
-            app.post { // Run next frame as Vars.clientLoaded is true then and the load methods depend on it
-                mainExecutor.execute {
-                    Log.debug("Loaded sound & music in @ms", measureTimeMillis {
-                        Musics.load() // Loading music isn't very important
-                        Sounds.load() // Same applies to sounds
-                    })
-                }
+            mainExecutor.execute {
+                Log.debug("Loaded sound & music in @ms", measureTimeMillis {
+                    Musics.load(true) // Loading music isn't very important
+                    Sounds.load(true) // Same applies to sounds
+                })
             }
 
             val changeHash = files.internal("changelog").readString().hashCode() // Display changelog if the file contents have changed & on first run. (this is really scuffed lol)
@@ -130,7 +126,7 @@ class ClientLogic {
 
             Navigation.navigator.init()
 
-            runMigrations()
+            Migrations().runMigrations()
 
             if (isDeveloper()) {
                 register("update <name/id...>") { args, _ ->
@@ -156,13 +152,13 @@ class ClientLogic {
             
             if (settings.getBool("showidinjoinleave", false))
                 ui.chatfrag.addMsg(bundle.format("client.disconnected.withid", e.player.id.toString()))
-                    .addButton(e.player.id.toString()) { app.setClipboardText("!undo ${e.player.id}") }
+                    .addButton(e.player.id.toString()) { app.clipboardText = "!undo ${e.player.id}" }
         }
 
         Events.on(GameOverEventClient::class.java) {
             if (net.client()) {
                 // Afk players will start mining at the end of a game (kind of annoying but worth it)
-                if (!Navigation.isFollowing || (Navigation.currentlyFollowing as? BuildPath)?.mineItems != null) Navigation.follow(MinePath(newGame = true))
+                if ((Navigation.currentlyFollowing as? BuildPath)?.mineItems == null) Navigation.follow(MinePath(newGame = true))
 
                 // Save maps on game over if the setting is enabled
                 if (settings.getBool("savemaponend")) control.saves.addSave(state.map.name())
@@ -247,65 +243,6 @@ class ClientLogic {
         Events.run(Trigger.draw) {
             camera.bounds(cameraBounds)
             cameraBounds.grow(2 * tilesizeF)
-        }
-    }
-
-    private fun runMigrations() {
-        val funs = ClientLogic::class.functions // Cached function list
-        var migration = settings.getInt("foomigration", 1) // Starts at 1
-        while (true) {
-            val migrateFun = funs.find { it.name == "migration$migration" } ?: break // Find next migration or break
-            Log.debug("Running foo's migration $migration")
-            migrateFun.isAccessible = true
-            migrateFun.call(this)
-            migrateFun.isAccessible = false
-            Log.debug("Finished running foo's migration $migration")
-            migration++
-        }
-        if (settings.getInt("foomigration", 1) != migration) settings.put("foomigration", migration) // Avoids saving settings if the value remains the same
-    }
-
-    @Suppress("unused")
-    private fun migration1() { // All of the migrations from before the existence of the migration system
-        // Old settings that no longer exist
-        settings.remove("drawhitboxes")
-        settings.remove("signmessages")
-        settings.remove("firescl")
-        settings.remove("effectscl")
-        settings.remove("commandwarnings")
-        settings.remove("nodeconfigs")
-        settings.remove("attemwarfarewhisper")
-
-        // Various setting names and formats have changed
-        if (settings.has("gameovertext")) {
-            if (settings.getString("gameovertext").isNotBlank()) settings.put("gamewintext", settings.getString("gameovertext"))
-            settings.remove("gameovertext")
-        }
-        if (settings.has("graphdisplay")) {
-            if (settings.getBool("graphdisplay")) settings.put("highlighthoveredgraph", true)
-            settings.remove("graphdisplay")
-        }
-        if (settings.getBool("drawhitboxes") && settings.getInt("hitboxopacity") == 0) { // Old setting was enabled and new opacity hasn't been set yet
-            settings.put("hitboxopacity", 30)
-            UnitType.hitboxAlpha = settings.getInt("hitboxopacity") / 100f
-        }
-    }
-
-    @Suppress("unused")
-    private fun migration2() { // Lowercased the pingExecutorThreads setting name1
-        if (!settings.has("pingExecutorThreads")) return
-        settings.put("pingexecutorthreads", settings.getInt("pingExecutorThreads"))
-        settings.remove("pingExecutorThreads")
-    }
-
-    @Suppress("unused")
-    private fun migration3() { // Finally changed Binding.navigate_to_camera to navigate_to_cursor
-        InputDevice.DeviceType.values().forEach { device ->
-            if (!settings.has("keybind-default-$device-navigate_to_camera-key")) return@forEach
-            val saved = settings.getInt("keybind-default-$device-navigate_to_camera-key")
-            settings.remove("keybind-default-$device-navigate_to_camera-key")
-            settings.remove("keybind-default-$device-navigate_to_camera-single")
-            keybinds.sections.first { it.name == "default" }.binds[device, ::OrderedMap].put(Binding.navigate_to_cursor, Axis(KeyCode.byOrdinal(saved)))
         }
     }
 }

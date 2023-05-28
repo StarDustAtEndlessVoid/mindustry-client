@@ -41,7 +41,7 @@ public class SNet implements SteamNetworkingCallback, SteamMatchmakingCallback, 
     final Interval timer = new Interval();
     final long[] alertIDs = {76561198064167539L}; // List of idiot's steam IDs
 
-    SteamID currentLobby, currentServer;
+    public SteamID currentLobby, currentServer;
     Cons<Host> lobbyCallback;
     Runnable lobbyDoneCallback, joinCallback;
 
@@ -389,7 +389,7 @@ public class SNet implements SteamNetworkingCallback, SteamMatchmakingCallback, 
             smat.setLobbyData(steamID, "versionType", Version.type);
             smat.setLobbyData(steamID, "wave", state.wave + "");
             smat.setLobbyData(steamID, "gamemode", state.rules.mode().name() + "");
-            ui.join.lastHost = new Host(
+            ui.join.lastHost = new Host( // FINISHME: Whats the point of this even
                     -1, //invalid ping
                     smat.getLobbyData(steamID, "name"),
                     "steam:" + steamID.handle(),
@@ -437,6 +437,28 @@ public class SNet implements SteamNetworkingCallback, SteamMatchmakingCallback, 
     public void onGameLobbyJoinRequested(SteamID lobby, SteamID steamIDFriend){
         Log.info("onGameLobbyJoinRequested @ @", lobby, steamIDFriend);
         smat.joinLobby(lobby);
+    }
+
+    @Override
+    public void onGameRichPresenceJoinRequested(SteamID steamIDFriend, String connect){
+        int last = connect.lastIndexOf(' ');
+        if(last != -1) connect = connect.substring(last + 1); // This will begin with "+connect_server " when run while ingame but won't otherwise
+        Log.info("onGameRichPresenceJoinRequested @ @", steamIDFriend, connect);
+
+        String[] split = connect.split(":");
+        if (split.length != 2) return; // Should always be in the format of ip:port
+        try{
+            ui.join.refreshCommunity();
+            int port = Integer.parseInt(split[1]);
+            ui.loadfrag.show("@connecting");
+            net.pingExecutor.execute(() -> {
+                Threads.sleep(Core.settings.getInt("serverbrowserpinglimit", 2000) + 500); // Pray that everything actually finishes in time (it should since this will run after/alongside
+                Core.app.post(() -> ui.join.connect(split[0], port));                                    // the last ping and the pings should all finish within the timeout from the last ping running)
+            });
+        }catch(Exception e){
+            Log.err("Error while joining server through steam @: @", steamIDFriend == null ? "launch argument" : "game info", e.getMessage());
+            e.printStackTrace();
+        }
     }
 
     public class SteamConnection extends NetConnection{

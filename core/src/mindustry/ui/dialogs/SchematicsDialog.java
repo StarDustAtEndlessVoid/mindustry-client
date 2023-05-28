@@ -12,7 +12,6 @@ import arc.scene.ui.*;
 import arc.scene.ui.ImageButton.*;
 import arc.scene.ui.TextButton.*;
 import arc.scene.ui.layout.*;
-import arc.scene.utils.*;
 import arc.struct.*;
 import arc.util.*;
 import mindustry.ctype.*;
@@ -110,7 +109,12 @@ public class SchematicsDialog extends BaseDialog{
 
             t.update(() -> {
                 if(Core.input.keyTap(Binding.chat) && Core.scene.getKeyboardFocus() == searchField && firstSchematic != null){
-                    control.input.isLoadedSchematic = true;
+                    if(!(state.rules.schematicsAllowed || Core.settings.getBool("forceallowschematics"))){
+                        ui.showInfo("@schematic.disabled");
+                    }else{
+                        control.input.useSchematic(firstSchematic);
+                        hide();
+                    }
                     control.input.useSchematic(firstSchematic);
                     hide();
                 }
@@ -221,9 +225,12 @@ public class SchematicsDialog extends BaseDialog{
                         if(state.isMenu()){
                             showInfo(s);
                         }else{
-                            control.input.isLoadedSchematic = true;
-                            control.input.useSchematic(s);
-                            hide();
+                            if(!(state.rules.schematicsAllowed || Core.settings.getBool("forceallowschematics"))){
+                                ui.showInfo("@schematic.disabled");
+                            }else{
+                                control.input.useSchematic(s);
+                                hide();
+                            }
                         }
                     }).pad(4).style(Styles.flati).get();
 
@@ -503,7 +510,12 @@ public class SchematicsDialog extends BaseDialog{
                         n.button(Icon.upSmall, Styles.emptyi, () -> {
                             int idx = tags.indexOf(tag);
                             if(idx > 0){
-                                tags.swap(idx, idx - 1);
+                                if(Core.input.shift()){
+                                    tags.swap(idx, 0);
+                                    tags.insert(0, tags.remove(idx));
+                                } else {
+                                    tags.swap(idx, idx - 1);
+                                }
                                 tagsChanged();
                                 rebuild[0].run();
                             }
@@ -580,18 +592,21 @@ public class SchematicsDialog extends BaseDialog{
                 float sum = 0f;
                 Table current = new Table().left();
                 for(var tag : tags){
-                    if(schem.labels.contains(tag)) continue;
 
-                    var next = Elem.newButton(tag, () -> {
-                        addTag(schem, tag);
+                    var next = new TextButton(tag, Styles.togglet);
+                    next.changed(() -> {
+                        if(schem.labels.contains(tag)){
+                            removeTag(schem, tag);
+                        } else {
+                            addTag(schem, tag);
+                        }
                         buildTags(schem, t, name);
-                        dialog.hide();
                     });
+                    next.setChecked(schem.labels.contains(tag));
                     next.getLabel().setWrap(false);
-
                     next.pack();
-                    float w = next.getPrefWidth() + Scl.scl(6f);
 
+                    float w = next.getPrefWidth() + Scl.scl(6f);
                     if(w + sum >= Core.graphics.getWidth() * (Core.graphics.isPortrait() ? 1f : 0.8f)){
                         p.add(current).row();
                         current = new Table();

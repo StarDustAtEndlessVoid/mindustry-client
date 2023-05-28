@@ -226,6 +226,15 @@ public class NetClient implements ApplicationListener{
 
     @Remote(targets = Loc.server, variants = Variant.both)
     public static void sendMessage(String message, @Nullable String unformatted, @Nullable Player playersender){
+        if(Server.fish.b() && Server.ohnoTask != null) { // Very hacky
+            if (message.contains("Too close to an enemy tile!")) return; // We don't care honestly
+            if (message.contains("Sorry, the max number of ohno units has been reached.") || message.contains("Ohnos have been temporarily disabled.")) {
+                Time.run(60f, () -> Server.ohnoTask = null); // Null it out a second later, this is just to prevent any additional messages from bypassing the return below
+                Server.ohnoTask.cancel();
+                return;
+            }
+        }
+
         Events.fire(new PlayerChatEvent(playersender, unformatted != null ? unformatted : message != null ? message : "")); // Foo addition, why is this not a vanilla thing?
         // message is the full formatted message from the server, including the sender
         // unformatted is the message content itself, i.e. "gg", null for server messages
@@ -285,8 +294,6 @@ public class NetClient implements ApplicationListener{
             //display raw unformatted text above player head
             playersender.lastText(unformatted);
             playersender.textFadeTime(1f);
-
-            Events.fire(new PlayerChatEvent(playersender, unformatted));
         }
 
         Events.fire(new PlayerChatEventClient());
@@ -295,27 +302,27 @@ public class NetClient implements ApplicationListener{
     //equivalent to above method but there's no sender and no console log
     @Remote(called = Loc.server, targets = Loc.server)
     public static void sendMessage(String message){
-        if(Vars.ui != null){
-            if (Core.settings.getBool("logmsgstoconsole") && net.client()) Log.infoTag("Chat", Strings.stripColors(InvisibleCharCoder.INSTANCE.strip(message)));
-            if (!message.contains("has connected") && !message.contains("has disconnected")) Log.debug("Tell the owner of this server to send messages properly");
-            message = processCoords(message, true);
-            var output = Vars.ui.chatfrag.addMessage(message, null, null, "", message);
+        if(Vars.ui == null) return;
 
-            findCoords(output);
-            findLinks(output, 0);
+        if (Core.settings.getBool("logmsgstoconsole") && net.client()) Log.infoTag("Chat", Strings.stripColors(InvisibleCharCoder.INSTANCE.strip(message)));
+        if (!message.contains("has connected") && !message.contains("has disconnected")) Log.debug("Tell the owner of this server to send messages properly");
+        message = processCoords(message, true);
+        var output = Vars.ui.chatfrag.addMessage(message, null, null, "", message);
 
-            if (Server.current.isVotekick(message)) { // Vote kick clickable buttons
-                String yes = Core.bundle.get("client.voteyes"), no = Core.bundle.get("client.voteno");
-                output.message = output.message + '\n' + yes + "  " + no;
-                output.format();
-                output.addButton(yes, () -> Call.sendChatMessage("/vote y"));
-                output.addButton(no, () -> Call.sendChatMessage("/vote n"));
-            }
+        findCoords(output);
+        findLinks(output, 0);
 
-            Server.current.handleVoteButtons(output);
-
-            Sounds.chatMessage.play();
+        if (Server.current.isVotekick(message)) { // Vote kick clickable buttons
+            String yes = Core.bundle.get("client.voteyes"), no = Core.bundle.get("client.voteno");
+            output.message = output.message + '\n' + yes + "  " + no;
+            output.format();
+            output.addButton(yes, () -> Call.sendChatMessage("/vote y"));
+            output.addButton(no, () -> Call.sendChatMessage("/vote n"));
         }
+
+        Server.current.handleVoteButtons(output);
+
+        Sounds.chatMessage.play();
     }
 
     public static class FoundCoords {
@@ -383,6 +390,8 @@ public class NetClient implements ApplicationListener{
             netServer.admins.blacklistDos(player.con.address);
             return;
         }
+
+        if(message == null) return;
 
         if(message.length() > maxTextLength){
             throw new ValidateException(player, "Player has sent a message above the text limit.");

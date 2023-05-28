@@ -20,7 +20,6 @@ import mindustry.client.*;
 import mindustry.client.antigrief.*;
 import mindustry.client.navigation.*;
 import mindustry.client.ui.*;
-import mindustry.client.utils.*;
 import mindustry.content.*;
 import mindustry.core.GameState.State;
 import mindustry.core.*;
@@ -113,28 +112,20 @@ public class HudFragment{
 
         //minimap + position
         parent.fill(t -> {
-            t.visible(() -> Core.settings.getBool("minimap") && shown);
-            t.table(ta -> {
-                //tile hud
-                ta.name = "minimap/position";
-                ta.add(new TileInfoFragment()).name("tilehud").top();
-                //minimap
-                ta.add(new Minimap()).name("minimap").top();
-            });
+            t.visible(() -> shown && Core.settings.getBool(("minimap"))); // FINISHME: Only hide minimap when doing so, use a collapser to shrink it maybe? Idk
+            t.name = "minimap/position";
+            //tile hud
+            t.add(new TileInfoFragment()).name("tilehud").top();
+            //minimap
+            t.add(new Minimap()).name("minimap").top();
             t.row();
             //position
-            t.label(() -> player.tileX() + ", " + player.tileY())
-            .tooltip("Player Position")
-            .visible(() -> Core.settings.getBool("position"))
-            .style(Styles.monoOutlineLabel)
-            .name("position").right();
-            t.row();
-            //cursor position
-            t.label(() -> "[coral]" + World.toTile(Core.input.mouseWorldX()) + ", " + World.toTile(Core.input.mouseWorldY()))
-            .tooltip("Cursor Position")
-            .visible(() -> Core.settings.getBool("position"))
-            .style(Styles.monoOutlineLabel)
-            .name("cursor").right();
+            t.label(() -> player.tileX() + ", " + player.tileY() + "\n" + "[coral]" + World.toTile(Core.input.mouseWorldX()) + ", " + World.toTile(Core.input.mouseWorldY()))
+                .tooltip("Player Position\n[coral]Cursor Position")
+                .visible(() -> Core.settings.getBool("position"))
+                .style(Styles.outlineLabel)
+                .name("position").top().right().labelAlign(Align.right)
+                .colspan(2);
             t.top().right();
         });
 
@@ -244,7 +235,7 @@ public class HudFragment{
                     if(!canSkipWave()) new Toast(1f).label(() -> "You tried and that's all that matters.");
                     else if(net.client() && player.admin) Call.adminRequest(player, AdminAction.wave);
                     else logic.skipWave();
-                }).growY().fillX().right().width(40f).name("skip").get().toBack();
+                }).growY().fillX().right().width(40f).name("skip");
             }).width(dsize * 6 + 4f).name("statustable");
 
             wavesMain.row();
@@ -344,11 +335,7 @@ public class HudFragment{
 
                 Events.on(TeamCoreDamage.class, event -> {
                     if (Time.timeSinceMillis(lastWarn) > 30_000) { // Prevent chat flooding
-                        if (Core.settings.getBool("broadcastcoreattack")) {
-                            ClientUtils.sendMessage(Strings.format("[scarlet]Core under attack: (@, @)", event.core.x, event.core.y));
-                        } else {
-                            NetClient.findCoords(ui.chatfrag.addMsg(Strings.format("[scarlet]Core under attack: (@, @)", event.core.x, event.core.y)));
-                        }
+                        NetClient.findCoords(ui.chatfrag.addMsg(Strings.format("[scarlet]Core under attack: (@, @)", event.core.x, event.core.y)));
                     }
                     lastWarn = Time.millis(); // Reset timer so that it sends 30s after the last core damage rather than every 30s FINISHME: Better way to do this?
                     coreAttackTime[0] = notifDuration;
@@ -423,7 +410,7 @@ public class HudFragment{
                 c.add("@nearpoint")
                 .update(l -> l.setColor(Tmp.c1.set(Color.white).lerp(Color.scarlet, Mathf.absin(Time.time, 10f, 1f))))
                 .labelAlign(Align.bottom | Align.center, Align.center)
-            ).margin(6).update(u -> 
+            ).margin(6).update(u ->
                 u.color.a = Mathf.lerpDelta(u.color.a, Mathf.num(spawner.playerNear()), 0.1f)
             ).get().color.a = 0f;
         });

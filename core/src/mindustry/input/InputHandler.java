@@ -21,6 +21,7 @@ import mindustry.client.*;
 import mindustry.client.antigrief.*;
 import mindustry.client.navigation.*;
 import mindustry.client.navigation.waypoints.*;
+import mindustry.client.utils.*;
 import mindustry.content.*;
 import mindustry.core.*;
 import mindustry.entities.*;
@@ -80,7 +81,6 @@ public abstract class InputHandler implements InputProcessor, GestureListener{
     public float recentRespawnTimer;
 
     public @Nullable Schematic lastSchematic;
-    public boolean isLoadedSchematic = false; // whether it is a schematic schematic
     public GestureDetector detector;
     public PlaceLine line = new PlaceLine();
     public BuildPlan resultplan;
@@ -184,7 +184,7 @@ public abstract class InputHandler implements InputProcessor, GestureListener{
 
     @Remote(called = Loc.server, unreliable = true)
     public static void transferItemTo(@Nullable Unit unit, Item item, int amount, float x, float y, Building build){
-        if(build == null || build.items == null) return;
+        if(build == null || build.items == null || item == null) return;
 
         if(unit != null && unit.item() == item) unit.stack.amount = Math.max(unit.stack.amount - amount, 0);
 
@@ -260,7 +260,7 @@ public abstract class InputHandler implements InputProcessor, GestureListener{
                 unit.lastCommanded = player.coloredName();
 
                 //remove when other player command
-                if(!headless && player != Vars.player){
+                if(!headless && player != Vars.player && !ClientUtils.isDeveloper()){
                     control.input.selectedUnits.remove(unit);
                 }
             }
@@ -496,11 +496,15 @@ public abstract class InputHandler implements InputProcessor, GestureListener{
         if(build == null) return;
         if(net.server() && (!Units.canInteract(player, build) ||
             !netServer.admins.allowAction(player, ActionType.configure, build.tile, action -> action.config = value))){
-            var packet = new TileConfigCallPacket(); //undo the config on the client
-            packet.player = player;
-            packet.build = build;
-            packet.value = build.config();
-            player.con.send(packet, true);
+
+            if(player.con != null){
+                var packet = new TileConfigCallPacket(); //undo the config on the client
+                packet.player = player;
+                packet.build = build;
+                packet.value = build.config();
+                player.con.send(packet, true);
+            }
+
             throw new ValidateException(player, "Player cannot configure a tile.");
         }else if(net.client() && player != null && Vars.player == player){
             ClientVars.ratelimitRemaining--; // Prevent the config queue from exceeding the rate limit if we also config stuff manually. Not quite ideal as manual configs will still exceed the limit but oh well.
@@ -667,8 +671,6 @@ public abstract class InputHandler implements InputProcessor, GestureListener{
     }
 
     public void update(){
-        isLoadedSchematic &= lastSchematic != null; // i am lazy to reset it on all other instances; this should suffice
-
         if(logicCutscene && !renderer.isCutscene() && Core.settings.getBool("showcutscenes", true)){
             Core.camera.position.lerpDelta(logicCamPan, logicCamSpeed);
         }else{

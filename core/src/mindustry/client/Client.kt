@@ -31,7 +31,7 @@ import java.security.*
 
 object Client {
     var leaves: Moderation? = Moderation()
-    val tiles = Seq<Tile>(false)
+    val tiles = Seq<Tile>()
     val timer = Interval(4)
     val autoTransfer by lazy { AutoTransfer() } // FINISHME: Awful
 //    val kts by lazy { ScriptEngineManager().getEngineByExtension("kts") }
@@ -42,7 +42,7 @@ object Client {
 
 
     fun initialize() {
-        setup()
+        mainExecutor.execute { setupCommands() }
         AutoTransfer.init()
         ClientLogic()
         Server // Force the init block to be run
@@ -102,10 +102,10 @@ object Client {
             }
         } else if (spawnTime != 0f && travelTime != 0f && spawner.spawns.size < 50 && timer.get(0, travelTime)) {
             if (timer.get(1, spawnTime)) tiles.addAll(spawner.spawns)
-            for (i in 0 until tiles.size) {
-                val t = tiles.remove(0)
+            for (i in tiles.size - 1 downTo 0) {
+                val t = tiles.get(i)
                 val target = pathfinder.getTargetTile(t, pathfinder.getField(state.rules.waveTeam, Pathfinder.costGround, Pathfinder.fieldCore))
-                if (target != t) tiles.add(target)
+                if (target != t) tiles.set(i, target) else tiles.remove(i)
                 Fx.healBlock.at(t.worldx(), t.worldy(), 1f, state.rules.waveTeam.color)
             }
         }
@@ -113,28 +113,31 @@ object Client {
         // Turret range
         val bounds = Core.camera.bounds(Tmp.r3).grow(tilesize.toFloat())
         if (showingTurrets || showingInvTurrets || showingAllyTurrets) {
-            val enemyunits = Core.settings.getBool("enemyunitranges")
-            val allyunits = Core.settings.getBool("allyunitranges")
             if (showingTurrets || showingInvTurrets) {
+                val enemyunits = Core.settings.getBool("enemyunitranges")
+                val showall = Core.settings.getBool("showallturrets")
                 val flying = player.unit().isFlying
+                val mousev = Core.input.mouseWorld()
+                val mouseBuild = world.buildWorld(mousev.x, mousev.y)
                 getTree().use {
                     intersect(bounds) {
-                        if (!fogControl.isDiscovered(player.team(), it.entity.tileX(), it.entity.tileY())) return@intersect
-                        if ((enemyunits || it.turret) && it.canShoot() && (it.targetAir || it.targetGround)) {//circles.add(it to if (it.canHitPlayer()) it.entity.team().color else Team.derelict.color)
+                        if (!(showall || fogControl.isDiscovered(player.team(), it.entity.tileX(), it.entity.tileY()))) return@intersect
+                        if ((enemyunits || it.turret) && it.canShoot() && (it.targetAir || it.targetGround) && it.entity != mouseBuild) {//circles.add(it to if (it.canHitPlayer()) it.entity.team().color else Team.derelict.color)
                             val valid = (flying && it.targetAir) || (!flying && it.targetGround)
                             val validInv = (!flying && it.targetAir) || (flying && it.targetGround)
                             Drawf.dashCircle(
-                                it.entity.x, it.entity.y, it.range - tilesize,
+                                it.entity.x, it.entity.y, it.range,
                                 if ((valid && showingTurrets) || (validInv && showingInvTurrets)) it.entity.team().color else Team.derelict.color)
                         }
                     }
                 }
             }
             if (showingAllyTurrets) {
+                val allyunits = Core.settings.getBool("allyunitranges")
                 getAllyTree().use {
                     intersect(bounds) {
                         if ((allyunits || it.turret) && it.canShoot() && (it.targetAir || it.targetGround)) {
-                            Drawf.dashCircle(it.entity.x, it.entity.y, it.range - tilesize, it.entity.team().color)
+                            Drawf.dashCircle(it.entity.x, it.entity.y, it.range, it.entity.team().color)
                         }
                     }
                 }
@@ -143,7 +146,7 @@ object Client {
 
         // Player controlled turret range
         if ((player.unit() as? BlockUnitUnit)?.tile() is BaseTurret.BaseTurretBuild) {
-            Drawf.dashCircle(player.x, player.y, player.unit().range(), player.team().color)
+            Drawf.dashCircle(player.x, player.y, player.unit().range(), player.team().color, Color.lightGray)
         }
 
         // Overdrive range
