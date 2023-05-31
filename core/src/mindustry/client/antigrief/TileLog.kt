@@ -1,6 +1,7 @@
 package mindustry.client.antigrief
 
 import arc.*
+import arc.math.Mathf
 import arc.math.geom.*
 import arc.scene.*
 import arc.scene.ui.layout.*
@@ -11,6 +12,7 @@ import mindustry.client.utils.*
 import mindustry.content.*
 import mindustry.core.*
 import mindustry.gen.Unit
+import mindustry.type.Item
 import mindustry.world.*
 import java.time.*
 import kotlin.math.*
@@ -285,4 +287,31 @@ class RotateTileLog(tile: Tile, cause: Interactor, val block: Block, val rotatio
     }
 
     override fun toShortString() = "${cause.shortName.stripColors().subSequence(0, min(16, cause.shortName.stripColors().length))}${if (cause.shortName.stripColors().length > 16) "..." else ""} ${Core.bundle.get("client.rotated")} ${block.localizedName}"
+}
+
+class CommandTileLog(tile: Tile, cause: Interactor, val block: Block, val poscom: Vec2) : TileLog(tile, cause) {
+    override fun apply(previous: TileState) {
+        previous.rotation = 0
+    }
+    override fun toString(): String {
+        return "${cause.name.stripColors()} ${Core.bundle.get("client.command")} ${block.localizedName} ${ " to "} ${Mathf.ceil(poscom.x/8)}  ${ ","}  ${Mathf.ceil(poscom.y/8)}"
+    }
+
+    override fun toShortString() = "${cause.shortName.stripColors().subSequence(0, min(16, cause.shortName.stripColors().length))}${if (cause.shortName.stripColors().length > 16) "..." else ""} ${Core.bundle.get("client.command")} ${block.localizedName}"
+}
+
+class WithdrawTileLog(tile: Tile, cause: Interactor, val block: Block, val item: Item) : TileLog(tile, cause) {
+    override fun apply(previous: TileState) {         previous.block = block    }
+    override fun toString(): String {
+        return "${cause.name.stripColors()} ${Core.bundle.get("client.withdraw")} ${item.localizedName} from ${block.localizedName} "
+    }
+    override fun toShortString() = "${cause.shortName.stripColors().subSequence(0, min(16, cause.shortName.stripColors().length))}${if (cause.shortName.stripColors().length > 16) "..." else ""} ${Core.bundle.get("client.withdraw")} ${item.localizedName}"
+}
+class DepositTileLog(tile: Tile, cause: Interactor, val block: Block, val item: Item) : TileLog(tile, cause) {
+    override fun apply(previous: TileState) {       previous.block = block    }
+    override fun toString(): String {
+        return "${cause.name.stripColors()} ${Core.bundle.get("client.deposit")} ${item.localizedName} to ${block.localizedName} "
+    }
+
+    override fun toShortString() = "${cause.shortName.stripColors().subSequence(0, min(16, cause.shortName.stripColors().length))}${if (cause.shortName.stripColors().length > 16) "..." else ""} ${Core.bundle.get("client.deposit")} ${item.localizedName}"
 }

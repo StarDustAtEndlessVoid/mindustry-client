@@ -6,6 +6,9 @@ import arc.util.*;
 import mindustry.ai.*;
 import mindustry.annotations.Annotations.*;
 import mindustry.client.*;
+import mindustry.client.navigation.Navigation;
+import mindustry.client.ui.PanelFragment;
+import mindustry.content.Blocks;
 import mindustry.core.GameState.*;
 import mindustry.ctype.*;
 import mindustry.game.EventType.*;
@@ -15,12 +18,15 @@ import mindustry.gen.*;
 import mindustry.maps.*;
 import mindustry.type.*;
 import mindustry.type.Weather.*;
+import mindustry.ui.fragments.ChatFragment;
 import mindustry.world.*;
 import mindustry.world.blocks.storage.CoreBlock.*;
 
+import java.time.LocalTime;
 import java.util.*;
 
 import static mindustry.Vars.*;
+import static mindustry.client.ClientVars.assistuser;
 
 /**
  * Logic module.
@@ -34,6 +40,31 @@ public class Logic implements ApplicationListener{
 
     public Logic(){
         Events.on(BlockDestroyEvent.class, event -> {
+            //deserter
+            if((event.tile.build instanceof CoreBuild core) && Core.settings.getBool("deserter")) {
+                if(core.team == player.team()) {netClient.disconnectQuietly();}
+            }
+
+            //core broke alarm
+            if(Core.settings.getBool("coredeathalarm")){
+                if(state.rules.coreCapture && Core.settings.getBool("coredeathalarmrecap")) {} else{
+                    if(event.tile.build instanceof CoreBuild core){
+                        if(core.team == player.team()){
+                            if(Core.settings.getBool("unitatchat") && !state.rules.coreCapture){
+                                if(state.rules.pvp) { Call.sendChatMessage("/t [#fa]" + "Our core at " + Mathf.ceil(core.x/8) + ", " + Mathf.ceil(core.y/8) + " death...");} else { Call.sendChatMessage("[#fa]" + "Our core at " + Mathf.ceil(core.x/8) + ", " + Mathf.ceil(core.y/8) + " death...");}
+                            }else{
+                                String alarm = "[#fa]" + "Our core at " + Mathf.ceil(core.x/8) + ", " + Mathf.ceil(core.y/8) + " death...";
+                                ChatFragment.ChatMessage msg = ui.chatfrag.addMessage(alarm, null, null, "", alarm);
+                                NetClient.findCoords(msg);
+                            }
+                        } else {
+                            String alarm ="[#" + core.team.color + "]" + core.team.name + " core at []" + Mathf.ceil(core.x/8) + ", " + Mathf.ceil(core.y/8) + " death.";
+                            ChatFragment.ChatMessage msg = ui.chatfrag.addMessage(alarm, null, null, "", alarm);
+                            NetClient.findCoords(msg);
+                        }
+                    }
+                }
+            }
             //skip if rule is off
             if(!state.rules.ghostBlocks) return;
 
@@ -127,6 +158,10 @@ public class Logic implements ApplicationListener{
             state.tick = 0f;
         });
 
+        Events.on(GameOverEventClient.class, e -> {
+            if(player.unit().plans.size > 0 ){player.unit().plans.clear();}
+        });
+
         Events.on(WorldLoadEvent.class, e -> {
             //enable infinite ammo for wave team by default
             state.rules.waveTeam.rules().infiniteAmmo = true;
@@ -207,6 +242,88 @@ public class Logic implements ApplicationListener{
         Events.on(UnitCreateEvent.class, e -> {
             if(e.unit.team == state.rules.defaultTeam){
                 state.stats.unitsCreated++;
+            }
+        });
+        Events.on(PlayerLeave.class, it -> { // Clear Follow Path and start mining
+            if(it.player == assistuser) {
+                Navigation.stopFollowing();
+                PanelFragment.startmining();
+                Core.settings.put("afkmode", true);
+            }
+        });
+
+        Events.on(BlockBuildBeginEventBefore.class, it -> { // Recording the construction of blocks
+            if(Core.settings.getBool("blocksplayersplan")) {
+                if (it.newBlock == null || it.newBlock == Blocks.air) {
+                    if (it.tile.build == null || !it.tile.block().rebuildable) return;
+                    ActionsHistory.blocksplayersplans.addFirst(new ActionsHistory.BlockPlayerPlan(it.tile.x, it.tile.y, (short) it.tile.build.rotation, it.tile.build.block.id,it.tile.build.config(), it.unit.getControllerName(), it.breaking));
+                    //state.teams.get(player.team()).blocksplayersplans.addFirst(new BlockPlayerPlan(it.tile.x, it.tile.y, (short) it.tile.build.rotation, it.tile.build.block.id,it.tile.build.config(), it.unit.getControllerName(), it.breaking));
+                } else {
+                    if (it.tile == null) return;
+                    //state.teams.get(player.team()).blocksplayersplans.addFirst(new BlockPlayerPlan(it.tile.x, it.tile.y, (short) 0,  it.newBlock.id, null, it.unit.getControllerName(), it.breaking));
+                    ActionsHistory.blocksplayersplans.addFirst(new ActionsHistory.BlockPlayerPlan(it.tile.x, it.tile.y, (short) 0,  it.newBlock.id, null, it.unit.getControllerName(), it.breaking));
+                }
+            }
+        });
+
+        Events.on(BuildRotateEvent.class, it -> { // Recording the confgigs of blocks
+            if(Core.settings.getBool("blocksplayersplan")) {
+                if (it.build == null || it.unit.controller() == null) return;
+                ActionsHistory.blockconfplayersplans.addFirst(new ActionsHistory.BlockConfigPlayerPlan((int)it.build.x/8, (int)it.build.y/8, it.build.block.id, it.unit.getControllerName()));
+                //state.teams.get(player.team()).blockconfplayersplans.addFirst(new BlockConfigPlayerPlan((int)it.build.x/8, (int)it.build.y/8, it.build.block.id, it.player.name));
+            }
+        });
+        Events.on(ConfigEvent.class, it -> { // Recording the confgigs of blocks
+            if(Core.settings.getBool("blocksplayersplan")) {
+                if (it.tile.block == null || it.player == null) return;
+                //state.teams.get(player.team()).blockconfplayersplans.addFirst(new BlockConfigPlayerPlan((int)it.tile.x/8, (int)it.tile.y/8, it.tile.block.id, it.player.name));
+                ActionsHistory.blockconfplayersplans.addFirst(new ActionsHistory.BlockConfigPlayerPlan((int)it.tile.x/8, (int)it.tile.y/8, it.tile.block.id, it.player.name));
+            }
+        });
+
+        Events.on(UnitDeadEvent.class, it -> { // Alarm of death units
+            if(Core.settings.getBool("unitdeathalarm")) {
+                if(Core.settings.getInt("unitdeathalarmhp") == 0) return;
+                Unit u = it.unit;
+                if(u.maxHealth >= Core.settings.getInt("unitdeathalarmhp")){
+                    String alarm = "[#" + u.team.color + "] " + u.type + ": " + Mathf.ceil(u.lastX/8) + "," + Mathf.ceil(u.lastY/8);
+                    if(!(u.getControllerName() == null)){
+                        alarm = alarm + " controlled by: " + u.getControllerName();
+                    }
+                    ChatFragment.ChatMessage msg = ui.chatfrag.addMessage(alarm, null, null, "", alarm);
+                    NetClient.findCoords(msg);
+                }
+            }
+        });
+
+
+        Events.on(PlayerUnitDeathEvent.class, it -> { // Alarm of death units with players
+            if(Core.settings.getBool("playerunitdeathalarm")) {
+                Unit u = it.unit;
+                if(!(u.getControllerName() == null)){
+                    if(Core.settings.getInt("playerunitdeathalarmhp") >= 0){
+                        LocalTime tempct = LocalTime.now();
+                        ActionsHistory.deathunitsplan.addFirst(new ActionsHistory.UnitsKilledByPlayers(u.getPlayer(), u, u.lastX, u.lastY, tempct));
+                        if(u.maxHealth >= Core.settings.getInt("playerunitdeathalarmhp")){
+                            if(Core.settings.getInt("playerunitdeathalarmhp") == 0) return;
+                            String alarm = "[#" + u.team.color + "] " + u.type + ": " + Mathf.ceil(u.lastX / 8) + "," + Mathf.ceil(u.lastY / 8) + " controlled by: " + u.getControllerName();
+                            ChatFragment.ChatMessage msg = ui.chatfrag.addMessage(alarm, null, null, "", alarm);
+                            NetClient.findCoords(msg);
+                        }
+                    }
+                } else if(!(u.lastCommanded == null)){
+                    if(Core.settings.getInt("playerunitdeathalarmhp") >= 0){
+                        LocalTime tempct = LocalTime.now();
+                        ActionsHistory.deathunitscontrolplan.addFirst(new ActionsHistory.UnitsKilledByControllPlayers(u.lastCommanded, u, u.lastX, u.lastY, tempct));
+                        if(u.maxHealth >= Core.settings.getInt("playerunitdeathalarmhp")){
+                            if(Core.settings.getInt("playerunitdeathalarmhp") == 0) return;
+                            String alarm = "[#" + u.team.color + "] " + u.type + ": " + Mathf.ceil(u.lastX/8) + "," + Mathf.ceil(u.lastY/8)+ " last command by: " + u.lastCommanded();
+                            ChatFragment.ChatMessage msg = ui.chatfrag.addMessage(alarm, null, null, "", alarm);
+                            NetClient.findCoords(msg);
+                        }
+                    }
+
+                }
             }
         });
     }

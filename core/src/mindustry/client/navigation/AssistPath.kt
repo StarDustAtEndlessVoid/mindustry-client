@@ -62,6 +62,7 @@ class AssistPath(val assisting: Player?, val type: Type = Type.Regular, var circ
         circleRadius = if(circling) assisting.unit().hitSize * Core.settings.getFloat("assistdistance", 5f) else 0f
 
         handleInput()
+        if(Core.settings.getBool("assistbutnuance")) return
 
         if (player.unit() is Minerc && assisting.unit() is Minerc) { // Code stolen from formationAi.java, matches player mine state to assisting
             val mine = player.unit() as Minerc

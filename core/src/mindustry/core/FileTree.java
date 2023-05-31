@@ -123,7 +123,7 @@ public class FileTree implements FileHandleResolver{
         var cached = Core.settings.getDataDirectory().child("cache").child(audio instanceof Sound ? path : fi.nameWithoutExtension() + "__" + length + "." + fi.extension()); // See Music#load
 
         if(!outdated() && cached.exists() && cached.length() == length){ // Cached up-to-date copy
-            audio.loadDirectly(cached);
+            //audio.loadDirectly(cached); //Fix Crash WTF??????
             Log.debug("Loaded @ @ from cache", clazz, cached.nameWithoutExtension());
             return;
         }

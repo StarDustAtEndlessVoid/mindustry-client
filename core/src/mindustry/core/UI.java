@@ -46,9 +46,15 @@ public class UI implements ApplicationListener, Loadable{
     public MenuFragment menufrag;
     public HudFragment hudfrag;
     public ChatFragment chatfrag;
+    public PanelFragment panelfragment;
+    public PlayerBlockListFragment listblockfrag;
+    public TrashDialog trashbase;
+
     public ConsoleFragment consolefrag;
     public MinimapFragment minimapfrag;
     public PlayerListFragment listfrag;
+    public FDFindFragment findfrag;
+
     public LoadingFragment loadfrag;
     public HintsFragment hints;
 
@@ -186,6 +192,10 @@ public class UI implements ApplicationListener, Loadable{
         chatfrag = new ChatFragment();
         minimapfrag = new MinimapFragment();
         listfrag = new PlayerListFragment();
+        findfrag = new FDFindFragment();
+        listblockfrag = new PlayerBlockListFragment();
+        panelfragment = new PanelFragment();
+        trashbase = new TrashDialog();
         loadfrag = new LoadingFragment();
         consolefrag = new ConsoleFragment();
 
@@ -240,6 +250,9 @@ public class UI implements ApplicationListener, Loadable{
         chatfrag.build(hudGroup);
         minimapfrag.build(hudGroup);
         listfrag.build(hudGroup);
+        findfrag.build(hudGroup);
+        listblockfrag.build(hudGroup);
+        panelfragment.build(hudGroup);
         consolefrag.build(hudGroup);
         loadfrag.build(group);
         new FadeInFragment().build(group);

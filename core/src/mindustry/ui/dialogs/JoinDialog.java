@@ -553,7 +553,15 @@ public class JoinDialog extends BaseDialog{
             safeConnect(host.address, host.port, host.version);
         }).width(w).top().left().growY();
     }
-
+    public static void connectme(String ip, int port){
+        Time.runTask(2f, () ->{
+            logic.reset();
+            net.reset();
+            netClient.beginConnecting();
+            net.connect(ip, port, ()->{});
+            //Events.fire(new EventType.ServerJoinEvent());
+        });
+    }
     public void connect(String ip, int port){
         if(player.name.trim().isEmpty()){
             ui.showInfo("@noname");

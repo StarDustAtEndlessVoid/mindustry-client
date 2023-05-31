@@ -64,6 +64,9 @@ public class Units{
         if(netClient != null){
             netClient.addRemovedEntity(uid);
         }
+        if(unit != null) {
+            Events.fire(new EventType.PlayerUnitDeathEvent(unit));
+        }
 
         if(unit != null){
             unit.killed();

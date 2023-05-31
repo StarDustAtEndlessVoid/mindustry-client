@@ -12,12 +12,14 @@ import arc.scene.ui.ImageButton.*;
 import arc.scene.ui.layout.*;
 import arc.struct.*;
 import arc.util.*;
-import mindustry.*;
+import mindustry.Vars;
 import mindustry.client.*;
 import mindustry.client.antigrief.*;
 import mindustry.client.navigation.*;
 import mindustry.client.utils.*;
 import mindustry.content.*;
+import mindustry.core.ActionsHistory;
+import mindustry.entities.units.BuildPlan;
 import mindustry.gen.*;
 import mindustry.graphics.*;
 import mindustry.net.*;
@@ -25,7 +27,11 @@ import mindustry.net.Packets.*;
 import mindustry.ui.*;
 import mindustry.ui.dialogs.*;
 
+import java.util.Iterator;
+
 import static mindustry.Vars.*;
+import static mindustry.client.ClientVars.assistuser;
+import static mindustry.client.ClientVars.nameforplans;
 
 public class PlayerListFragment{
     public Table content = new Table().marginRight(13f).marginLeft(13f);
@@ -90,7 +96,7 @@ public class PlayerListFragment{
             Navigation.currentlyFollowing instanceof AssistPath p && p.getAssisting() != null ? p.getAssisting() :
             Navigation.currentlyFollowing instanceof UnAssistPath p ? p.target :
             null;
-        players.sort(Structs.comps(Structs.comparingBool(p -> p != target), Structs.comps(Structs.comparing(Player::team), Structs.comps(Structs.comparingBool(p -> !p.admin), Structs.comparingBool(p -> !(p.fooUser || p.isLocal()))))));
+        players.sort(Structs.comps(Structs.comparingBool(p -> p != target), Structs.comps(Structs.comparing(Player::team), Structs.comparingBool(p -> !p.admin))));
         if(search.getText().length() > 0) players.filter(p -> Strings.stripColors(p.name().toLowerCase()).contains(search.getText().toLowerCase()));
 
         for(var user : players){
@@ -126,7 +132,8 @@ public class PlayerListFragment{
                 Styles.nonetdef, () ->
                 Core.app.setClipboardText(Core.input.shift() ? String.valueOf(user.id) :
                     Core.input.ctrl() ? "Groups.player.getByID(" + user.id + ")" :
-                    Strings.stripColors(user.name))
+                    //Strings.stripColors(user.name))
+                    user.name)
             ).wrap().width(400).growY().pad(10);
 
             if(user.admin && !(!user.isLocal() && net.server())) button.image(Icon.admin).padRight(7.5f);
@@ -203,22 +210,48 @@ public class PlayerListFragment{
                     });
                 }).size(h/2);
             }
-            if (user != player) {
+            //if (user != player) {
+            if (true) {
+                if(Core.settings.getBool("blocksplayersplan")){
+                    content.table(info -> {
+
+                        content.button("[#00ff]" + (Core.settings.getBool("blocksplayersplancount") ? PlayerBlockListFragment.BlockBuDe(user, false) : (Core.input.shift() ? PlayerBlockListFragment.BlockBuDe(user, false) : "-") ), () -> {
+                            nameforplans = PlayerBlockListFragment.DeletePrefix(user.name);
+                        }).maxHeight(25).minWidth(80);
+                    });
+
+                    content.button("[#0000ff]" + (Core.settings.getBool("blocksplayersplancount") ? PlayerBlockListFragment.BlockCon(user, true) : (Core.input.shift() ? PlayerBlockListFragment.BlockBuDe(user, false) : "-") ), () -> {
+                        nameforplans = PlayerBlockListFragment.DeletePrefix(user.name);;
+                    }).maxHeight(25).minWidth(80);
+
+                    content.button("[#ff]" + (Core.settings.getBool("blocksplayersplancount") ? PlayerBlockListFragment.BlockBuDe(user, true) : (Core.input.shift() ? PlayerBlockListFragment.BlockBuDe(user, true) : "-") ), () -> {
+                        nameforplans = null;
+                    }).maxHeight(25).minWidth(80);
+
+                    content.button("[#cccccc]" + "fix", () -> {
+                        Iterator<ActionsHistory.BlockPlayerPlan> broken = ActionsHistory.blocksplayersplans.iterator();
+                        while(broken.hasNext()){
+                            ActionsHistory.BlockPlayerPlan plan = broken.next();
+                            if(user.name.equals(plan.lastacs) && plan.wasbreaking) {
+                                player.unit().addBuild(new BuildPlan(plan.x, plan.y, plan.rotation, Vars.content.block(plan.block), plan.config));
+                            }
+                        }
+                    }).maxHeight(25).minWidth(50);
+                }
+
                 button.button(Icon.lock, ustyle, // Mute player
                         () -> ClientUtils.toggleMutePlayer(user)).size(h / 2).tooltip("@client.mute");
                 button.button(Icon.copy, ustyle, // Assist/copy
-                        () -> Navigation.follow(new AssistPath(user,
-                                Core.input.shift() ? AssistPath.Type.FreeMove :
-                                Core.input.ctrl() ? AssistPath.Type.Cursor :
-                                Core.input.alt() ? AssistPath.Type.BuildPath :
-                                                    AssistPath.Type.Regular, Core.settings.getBool("circleassist"))
-                        )).size(h / 2).tooltip("@client.assist");
+                        () -> {Navigation.follow(new AssistPath(user,Core.input.shift() ? AssistPath.Type.FreeMove :Core.input.ctrl() ? AssistPath.Type.Cursor :Core.input.alt() ? AssistPath.Type.BuildPath :AssistPath.Type.Regular, Core.settings.getBool("circleassist")));
+                            assistuser = user;
+                        }
+                ).size(h / 2).tooltip("@client.assist");
                 button.button(Icon.cancel, ustyle, // Unassist/block
                         () -> Navigation.follow(new UnAssistPath(user, !Core.input.shift()))).size(h / 2).tooltip("@client.unassist");
                 button.button(Icon.move, ustyle, // Goto
-                    () -> Navigation.navigateTo(user)).size(h / 2).tooltip("@client.goto");
+                        () -> Navigation.navigateTo(user)).size(h / 2).tooltip("@client.goto");
                 button.button(Icon.zoom, ustyle, // Spectate/stalk
-                    () -> Spectate.INSTANCE.spectate(user, Core.input.shift())).tooltip("@client.spectate");
+                        () -> Spectate.INSTANCE.spectate(user, Core.input.shift())).tooltip("@client.spectate");
             }
 
             if (Server.current.freeze.canRun()) { // Apprentice+ on io, Colonel+ on phoenix

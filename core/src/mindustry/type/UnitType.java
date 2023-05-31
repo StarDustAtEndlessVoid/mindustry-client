@@ -529,12 +529,16 @@ public class UnitType extends UnlockableContent{
             bars.row();
 
             if(state.rules.unitAmmo){
-                bars.add(new Bar(ammoType.icon() + " " + Core.bundle.get("stat.ammo"), ammoType.barColor(), () -> unit.ammo / ammoCapacity));
+                bars.add(new Bar(ammoType.icon() + " " + Core.bundle.get("stat.ammo") + unit.ammo + "/" + ammoCapacity, ammoType.barColor(), () -> unit.ammo / ammoCapacity));
                 bars.row();
             }
 
             for(Ability ability : unit.abilities){
                 ability.displayBars(unit, bars);
+            }
+            if(unit.shield != 0f){
+                bars.add(new Bar(Mathf.ceil(unit.shield*10f)/10f + "", Pal.darkestGray, () -> unit.shield / unit.shield).blink(Color.white));
+                bars.row();
             }
 
             if(payloadCapacity > 0 && unit instanceof Payloadc payload){

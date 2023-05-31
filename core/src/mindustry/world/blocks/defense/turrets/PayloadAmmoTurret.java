@@ -156,7 +156,7 @@ public class PayloadAmmoTurret extends Turret{
         public void displayBars(Table bars){
             super.displayBars(bars);
 
-            bars.add(new Bar("stat.ammo", Pal.ammo, () -> (float)totalAmmo / maxAmmo)).growX();
+            bars.add(new Bar(totalAmmo + "/" + maxAmmo, Pal.ammo, () -> (float)totalAmmo / maxAmmo)).growX();
             bars.row();
         }
 

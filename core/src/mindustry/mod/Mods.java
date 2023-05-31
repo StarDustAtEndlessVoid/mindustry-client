@@ -1129,6 +1129,7 @@ public class Mods implements Loadable{
 
         /** Some mods are known to cause issues with the game; this detects and returns whether a mod is manually blacklisted. */
         public boolean isBlacklisted(){
+            if(Core.settings.getBool("offblacklistmods")) return false;
             return blacklistedMods.contains(name) && !OS.hasProp(Strings.format("allow-@", name));
         }
 

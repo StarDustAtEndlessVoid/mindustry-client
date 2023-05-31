@@ -257,6 +257,8 @@ public abstract class ClientLauncher extends ApplicationCore implements Platform
         }
 
         int targetfps = Core.settings.getInt("fpscap", 120);
+        if( (player != null) && Core.settings.getBool("targetfpsoff")){targetfps = 5;}
+
 
         if(targetfps > 0 && targetfps <= 240){
             long target = (1000 * 1000000) / targetfps; //target in nanos

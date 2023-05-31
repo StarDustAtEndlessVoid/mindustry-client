@@ -125,6 +125,8 @@ public class Renderer implements ApplicationListener{
         loadFluidFrames();
 
         Events.on(ClientLoadEvent.class, e -> {
+            Core.settings.put("offrender", false);
+            Core.settings.put("targetfpsoff", false);
             loadFluidFrames();
         });
 
@@ -287,6 +289,10 @@ public class Renderer implements ApplicationListener{
     }
 
     public void draw(){
+        if(Core.settings.getBool("offrender")){
+            Draw.reset();
+            return;
+        }
         Events.fire(Trigger.preDraw);
 
         camera.update();

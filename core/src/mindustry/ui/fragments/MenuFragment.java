@@ -20,8 +20,10 @@ import mindustry.game.EventType.*;
 import mindustry.gen.*;
 import mindustry.graphics.*;
 import mindustry.ui.*;
+import mindustry.ui.dialogs.JoinDialog;
 
 import static mindustry.Vars.*;
+import static mindustry.client.ClientVars.autoconnectme;
 import static mindustry.gen.Tex.*;
 
 public class MenuFragment{
@@ -263,6 +265,15 @@ public class MenuFragment{
             t.visible(() -> !t.getChildren().isEmpty());
 
         }).width(width).growY();
+        if(Core.settings.getBool("autoconnectme")){
+            String adrip = Core.settings.getString("adrip");
+            String adrport = Core.settings.getString("adrport");
+            if(autoconnectme) return;;
+            if(!adrip.isEmpty() && !adrport.isEmpty()){
+                JoinDialog.connectme(adrip, Integer.parseInt(adrport));
+                autoconnectme = true;
+            }
+        }
     }
 
     private void checkPlay(Runnable run){

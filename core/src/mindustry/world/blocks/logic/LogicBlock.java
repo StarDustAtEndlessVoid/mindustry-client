@@ -14,6 +14,7 @@ import arc.struct.Bits;
 import arc.struct.*;
 import arc.util.*;
 import arc.util.io.*;
+import mindustry.Vars;
 import mindustry.ai.types.*;
 import mindustry.client.*;
 import mindustry.client.antigrief.*;
@@ -667,6 +668,16 @@ public class LogicBlock extends Block{
                     Timer.schedule(() -> ClientVars.configs.add(new ConfigRequest(this, LogicBlock.compress(original, relativeConnections()))), net.client() ? netClient.getPing()/1000f : 0);
                 });
             }).size(40).tooltip("Restart code execution").disabled(b -> !ClientVars.configs.isEmpty());
+            table.row();
+            table.button(Icon.copy, Styles.cleari, () ->{
+                Core.app.setClipboardText(this.code);
+            }).tooltip("@schematic.copy").size(40);
+            table.button(Icon.download, Styles.cleari, () ->{
+                String configcode = Core.app.getClipboardText().replace("\r\n", "\n");
+                this.code = configcode;
+                this.updateCode(configcode);
+                Call.tileConfig(Vars.player, this, this.config());
+            }).tooltip("@schematic.copy.import").size(40);
         }
 
         @Override

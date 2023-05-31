@@ -82,7 +82,8 @@ public class ForceProjector extends Block{
     @Override
     public void setBars(){
         super.setBars();
-        addBar("shield", (ForceBuild entity) -> new Bar("stat.shieldhealth", Pal.accent, () -> 1f - entity.buildup / (shieldHealth + phaseShieldBoost * entity.phaseHeat)).blink(Color.white));
+        addBar("shield", (ForceBuild entity) -> new Bar(Mathf.ceil(10f * ((entity.health + phaseShieldBoost * entity.phaseHeat) - entity.buildup))/10f + "/" + (shieldHealth + phaseShieldBoost * entity.phaseHeat),
+                Pal.accent, () -> 1f - entity.buildup / (shieldHealth + phaseShieldBoost * entity.phaseHeat)).blink(Color.white));
     }
 
     @Override

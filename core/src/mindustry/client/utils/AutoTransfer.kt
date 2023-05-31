@@ -44,6 +44,14 @@ class AutoTransfer {
             minTransfer = Core.settings.getInt("autotransfer-mintransfer", 2)
             drain = Core.settings.getBool("autotransfer-drain", false) // Undocumented for now as drain is very experimental
         }
+        @JvmStatic
+        fun setminres(x: Int) {
+            minCoreItems = x
+        }
+        @JvmStatic
+        fun setdelay(z: Float) {
+            delay = z
+        }
     }
 
     val builds = Seq<Building>()

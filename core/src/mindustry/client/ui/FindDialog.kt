@@ -91,6 +91,8 @@ object FindDialog : BaseDialog("@client.find") {
 
         setup()
         shown(this::setup)
+        cont.row()
+        //cont.button("fd"){ui.finddialogfd.show()}.height(50f).width(50f)
         addCloseListener()
     }
 
